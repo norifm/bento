@@ -1,0 +1,100 @@
+#!/bin/sh
+# Supervises navidrome, octo-fiesta and nginx. If any of them exits, the others are stopped
+# and the container exits non-zero, so the restart policy brings the whole stack back.
+set -eu
+
+log() { echo "[navi-fiesta] $*"; }
+
+# Arguments are forwarded to octo-fiesta (e.g. `docker compose run --rm navi-fiesta --tidal-login`).
+if [ "$#" -gt 0 ]; then
+    exec /usr/local/bin/octo-fiesta "$@"
+fi
+
+# Docker-secrets style: FOO_FILE=/run/secrets/foo exports FOO with the file's contents,
+# e.g. Subsonic__AdminPassword_FILE keeps the navidrome password out of the compose/.env files.
+file=""
+for var in $(env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)_FILE=.*/\1/p'); do
+    eval "file=\${${var}_FILE}"
+    if [ ! -r "$file" ]; then
+        log "${var}_FILE: cannot read $file"
+        exit 1
+    fi
+    export "$var=$(cat "$file")"
+    unset "${var}_FILE"
+done
+
+case "${Tidal__TokenStore:-}" in
+    */*) mkdir -p "${Tidal__TokenStore%/*}" 2>/dev/null || true ;;
+esac
+
+# octo-fiesta's navidrome admin login. Unless one is configured explicitly, the navidrome fork
+# provisions a dedicated service account with a fresh random password on every start. The password
+# only lives in this script's memory and octo-fiesta's environment.
+octo_user=""
+octo_password=""
+if [ -z "${Subsonic__AdminUsername:-}" ] && [ -n "${NAVI_FIESTA_SERVICE_ACCOUNT:-}" ]; then
+    secret_dir=$(mktemp -d)
+    if /app/navidrome --nobanner service-account \
+        --username "$NAVI_FIESTA_SERVICE_ACCOUNT" --password-file "$secret_dir/password"; then
+        if [ -s "$secret_dir/password" ]; then
+            octo_user=$NAVI_FIESTA_SERVICE_ACCOUNT
+            octo_password=$(cat "$secret_dir/password")
+        fi
+    else
+        log "could not provision service account '$NAVI_FIESTA_SERVICE_ACCOUNT', octo-fiesta runs without admin rights"
+    fi
+    rm -rf "$secret_dir"
+fi
+
+run_octo_fiesta() {
+    if [ -n "$octo_user" ]; then
+        export Subsonic__AdminUsername="$octo_user" Subsonic__AdminPassword="$octo_password"
+    fi
+    exec /usr/local/bin/octo-fiesta
+}
+
+pids=""
+start() {
+    name=$1
+    shift
+    "$@" &
+    pids="$pids $!"
+    log "started $name (pid $!)"
+}
+
+stop() {
+    trap - TERM INT
+    # shellcheck disable=SC2086
+    kill -TERM $pids 2>/dev/null || true
+    wait || true
+    exit "$1"
+}
+trap 'log "stopping"; stop 0' TERM INT
+
+start navidrome /app/navidrome
+
+# octo-fiesta validates the navidrome connection on startup, so give navidrome a head start.
+i=0
+until curl -fsS -o /dev/null "http://127.0.0.1:${ND_PORT}/ping" 2>/dev/null; do
+    i=$((i + 1))
+    if [ "$i" -ge 120 ]; then
+        log "navidrome did not answer within 60s, starting octo-fiesta anyway"
+        break
+    fi
+    sleep 0.5
+done
+
+start octo-fiesta run_octo_fiesta
+start nginx nginx -e stderr -g 'daemon off;'
+
+while :; do
+    for pid in $pids; do
+        if ! kill -0 "$pid" 2>/dev/null; then
+            log "process $pid exited, stopping the stack"
+            stop 1
+        fi
+    done
+    # Waiting on a background sleep lets traps fire immediately and reaps exited children.
+    sleep 5 &
+    wait $! || true
+done

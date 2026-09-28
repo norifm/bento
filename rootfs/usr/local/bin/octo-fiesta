@@ -1,0 +1,3 @@
+#!/bin/sh
+# Runs octo-fiesta directly, e.g. `docker exec -it navi-fiesta octo-fiesta --tidal-login`.
+cd /opt/octo-fiesta && exec dotnet octo-fiesta.dll "$@"

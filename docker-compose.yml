@@ -1,0 +1,86 @@
+services:
+  navi-fiesta:
+    image: ghcr.io/filipton/navi-fiesta:latest
+    container_name: navi-fiesta
+    restart: unless-stopped
+    ports:
+      - "4533:4533"
+    # Cap json logs so a chatty day can't fill the phone's storage.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "2"
+    environment:
+      # ===== NAVIDROME =====
+      ND_BASEURL: ${ND_BASEURL:-}
+      ND_LASTFM_APIKEY: ${ND_LASTFM_APIKEY:-}
+      ND_LASTFM_SECRET: ${ND_LASTFM_SECRET:-}
+      ND_COVERARTPRIORITY: ${ND_COVERARTPRIORITY:-cover.*, folder.*, front.*, embedded}
+      ND_ENABLEARTWORKPRECACHE: ${ND_ENABLEARTWORKPRECACHE:-true}
+      ND_IMAGECACHESIZE: ${ND_IMAGECACHESIZE:-500MB}
+
+      # ===== OCTO-FIESTA =====
+      # Subsonic__Url, Library__DownloadPath (/music) and the Tidal token store (/data/octo-fiesta)
+      # are preset by the image.
+      # octo-fiesta gets its own navidrome admin account ("octo-fiesta") with a random password that
+      # rotates on every start, so no navidrome credentials are configured here. To use an existing
+      # account instead, set Subsonic__AdminUsername and Subsonic__AdminPassword_FILE (a Docker secret).
+      Subsonic__MusicService: ${MUSIC_SERVICE:-Deezer}
+      Subsonic__StorageMode: ${STORAGE_MODE:-Permanent}
+      Subsonic__CacheDurationHours: ${CACHE_DURATION_HOURS:-1}
+      Subsonic__EnableExternalPlaylists: ${ENABLE_EXTERNAL_PLAYLISTS:-true}
+      Subsonic__PlaylistsDirectory: ${PLAYLISTS_DIRECTORY:-playlists}
+      Subsonic__ExplicitFilter: ${EXPLICIT_FILTER:-All}
+      Subsonic__DownloadMode: ${DOWNLOAD_MODE:-Track}
+      Subsonic__AutoUpgradeQuality: ${AUTO_UPGRADE_QUALITY:-false}
+      Subsonic__FolderTemplate: ${FOLDER_TEMPLATE:-{artist}/{album}/{track} - {title}}
+      # The bundled navidrome is the fork, so the upload API is always available.
+      Subsonic__UseNavidromeUploadApi: ${USE_NAVIDROME_UPLOAD_API:-true}
+      Subsonic__NavidromeLibraryId: ${NAVIDROME_LIBRARY_ID:-1}
+      Subsonic__NavidromeUploadFolder: ${NAVIDROME_UPLOAD_FOLDER:-}
+
+      ExternalCover__IndicatorSize: ${EXTERNAL_COVER_INDICATOR_SIZE:-1}
+      ExternalCover__IndicatorSaturation: ${EXTERNAL_COVER_INDICATOR_SATURATION:-1}
+      ExternalCover__IndicatorColor: ${EXTERNAL_COVER_INDICATOR_COLOR:-0}
+
+      Deezer__Arl: ${DEEZER_ARL:-}
+      Deezer__ArlFallback: ${DEEZER_ARL_FALLBACK:-}
+      Deezer__Quality: ${DEEZER_QUALITY:-}
+
+      Qobuz__UserAuthToken: ${QOBUZ_USER_AUTH_TOKEN:-}
+      Qobuz__UserId: ${QOBUZ_USER_ID:-}
+      Qobuz__Quality: ${QOBUZ_QUALITY:-}
+      Qobuz__AppId: ${QOBUZ_APP_ID:-}
+      Qobuz__AppSecret: ${QOBUZ_APP_SECRET:-}
+
+      Tidal__Quality: ${TIDAL_QUALITY:-}
+
+      Yandex__OAuthToken: ${YANDEX_OAUTH_TOKEN:-}
+      Yandex__Quality: ${YANDEX_QUALITY:-}
+      Yandex__Language: ${YANDEX_LANGUAGE:-}
+      Yandex__IncludeUnavailable: ${YANDEX_INCLUDE_UNAVAILABLE_TRACKS:-false}
+    volumes:
+      - ./data:/data
+      - ./lib:/music
+
+  # Optional Cloudflare Tunnel for hosts without port forwarding:
+  #   1. Zero Trust dashboard -> Networks -> Tunnels -> create a tunnel, copy its token into .env as TUNNEL_TOKEN
+  #   2. Add a public hostname pointing to http://navi-fiesta:4533
+  #   3. docker compose --profile tunnel up -d
+  # With the tunnel in place, the "ports:" mapping above can be removed entirely.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: navi-fiesta-tunnel
+    profiles: [tunnel]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - navi-fiesta
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
