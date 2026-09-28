@@ -3,6 +3,7 @@ services:
     image: ghcr.io/filipton/navi-fiesta:latest
     container_name: navi-fiesta
     restart: unless-stopped
+    # Not needed when using the Cloudflare Tunnel (TUNNEL_TOKEN below).
     ports:
       - "4533:4533"
     # Cap json logs so a chatty day can't fill the phone's storage.
@@ -12,6 +13,11 @@ services:
         max-size: "10m"
         max-file: "2"
     environment:
+      # ===== CLOUDFLARE TUNNEL (optional) =====
+      # For hosts without port forwarding. Create a tunnel in Cloudflare Zero Trust, point its public
+      # hostname at http://localhost:4533 and paste the token here (or use TUNNEL_TOKEN_FILE).
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+
       # ===== NAVIDROME =====
       ND_BASEURL: ${ND_BASEURL:-}
       ND_LASTFM_APIKEY: ${ND_LASTFM_APIKEY:-}
@@ -64,23 +70,3 @@ services:
       - ./data:/data
       - ./lib:/music
 
-  # Optional Cloudflare Tunnel for hosts without port forwarding:
-  #   1. Zero Trust dashboard -> Networks -> Tunnels -> create a tunnel, copy its token into .env as TUNNEL_TOKEN
-  #   2. Add a public hostname pointing to http://navi-fiesta:4533
-  #   3. docker compose --profile tunnel up -d
-  # With the tunnel in place, the "ports:" mapping above can be removed entirely.
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: navi-fiesta-tunnel
-    profiles: [tunnel]
-    restart: unless-stopped
-    command: tunnel --no-autoupdate run
-    environment:
-      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
-    depends_on:
-      - navi-fiesta
-    logging:
-      driver: json-file
-      options:
-        max-size: "5m"
-        max-file: "2"

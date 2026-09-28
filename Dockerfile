@@ -7,8 +7,10 @@
 ARG NAVIDROME_IMAGE=ghcr.io/filipton/navidrome:develop
 ARG OCTO_REPO=https://github.com/filipton/octo-fiesta.git
 ARG OCTO_REF=dev
+ARG CLOUDFLARED_IMAGE=cloudflare/cloudflared:latest
 
 FROM ${NAVIDROME_IMAGE} AS navidrome
+FROM ${CLOUDFLARED_IMAGE} AS cloudflared
 
 FROM scratch AS octo-src
 ARG OCTO_REPO
@@ -50,7 +52,7 @@ RUN --mount=type=cache,target=/root/.nuget/packages \
     rm -f /out/*.pdb /out/appsettings.Development.json
 
 ########################################################################################################################
-### Final image: navidrome's runtime (ffmpeg, mpv, sqlite, libwebp) + .NET runtime + nginx
+### Final image: navidrome's runtime (ffmpeg, mpv, sqlite, libwebp) + .NET runtime + nginx + cloudflared
 FROM navidrome AS final
 LABEL org.opencontainers.image.source="https://github.com/filipton/navi-fiesta"
 LABEL org.opencontainers.image.description="Navidrome + octo-fiesta behind one nginx port"
@@ -63,6 +65,8 @@ RUN apk add --no-cache icu-libs icu-data-en libgcc libstdc++ nginx tini && \
 COPY --from=mcr.microsoft.com/dotnet/aspnet:9.0-alpine /usr/share/dotnet /usr/share/dotnet
 RUN ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet
 COPY --from=octo-build /out /opt/octo-fiesta
+# Static Go binary; only started when TUNNEL_TOKEN is set.
+COPY --from=cloudflared /usr/local/bin/cloudflared /usr/local/bin/cloudflared
 COPY --chmod=755 rootfs/usr/local/bin/ /usr/local/bin/
 COPY rootfs/etc/nginx/nginx.conf /etc/nginx/nginx.conf
 RUN nginx -e stderr -t -q && rm -rf /tmp/nginx*

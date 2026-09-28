@@ -10,7 +10,7 @@ One multi-arch image (`linux/amd64`, `linux/arm64`) with the
 ```
 
 - **Small**: extends the prebuilt `ghcr.io/filipton/navidrome:develop` image and adds only the ASP.NET
-  runtime, octo-fiesta, nginx and tini (~385 MB total, of which navidrome's base is ~250 MB).
+  runtime, octo-fiesta, nginx, tini and cloudflared (~425 MB total, of which navidrome's base is ~250 MB).
   Only English ICU data is shipped.
 - **Fast to build**: navidrome is not recompiled; octo-fiesta is cross-compiled for musl on the
   build host, so arm64 builds need no QEMU (~30 s warm).
@@ -53,15 +53,17 @@ Tidal login: `docker compose run --rm navi-fiesta --tidal-login` (arguments go t
 
 ### Without port forwarding (Cloudflare Tunnel)
 
-`docker-compose.yml` has an optional `cloudflared` sidecar. It's a separate image, so installs that don't
-use it don't pay for it.
+`cloudflared` is built in and starts only when `TUNNEL_TOKEN` is set:
 
-1. Cloudflare Zero Trust -> Networks -> Tunnels -> create a tunnel and put its token in `.env` as `TUNNEL_TOKEN`.
-2. Add a public hostname for the tunnel with service `http://navi-fiesta:4533`.
-3. `docker compose --profile tunnel up -d`. The `ports:` mapping can then be dropped entirely.
+1. Cloudflare Zero Trust -> Networks -> Tunnels -> create a tunnel and put its token in `.env` as `TUNNEL_TOKEN`
+   (or mount it and set `TUNNEL_TOKEN_FILE`).
+2. Add a public hostname for the tunnel with service `http://localhost:4533` (cloudflared runs in the same
+   container as nginx).
+3. `docker compose up -d`. The `ports:` mapping can then be dropped entirely.
 
 Set `ND_BASEURL` to the tunnel's `https://` hostname. Client IPs arrive via `CF-Connecting-IP` and are
-forwarded to navidrome as `X-Real-IP`.
+forwarded to navidrome as `X-Real-IP`. The token is only passed to cloudflared's process. Other
+`TUNNEL_*` variables (e.g. `TUNNEL_TRANSPORT_PROTOCOL=http2` where UDP is blocked) go straight to cloudflared.
 
 ### Outer reverse proxy
 

@@ -46,6 +46,15 @@ if [ -z "${Subsonic__AdminUsername:-}" ] && [ -n "${NAVI_FIESTA_SERVICE_ACCOUNT:
     rm -rf "$secret_dir"
 fi
 
+# The tunnel token is only handed to cloudflared, not to the other processes.
+tunnel_token=${TUNNEL_TOKEN:-}
+unset TUNNEL_TOKEN
+
+run_cloudflared() {
+    export TUNNEL_TOKEN="$tunnel_token"
+    exec cloudflared --no-autoupdate tunnel run
+}
+
 run_octo_fiesta() {
     if [ -n "$octo_user" ]; then
         export Subsonic__AdminUsername="$octo_user" Subsonic__AdminPassword="$octo_password"
@@ -86,6 +95,9 @@ done
 
 start octo-fiesta run_octo_fiesta
 start nginx nginx -e stderr -g 'daemon off;'
+if [ -n "$tunnel_token" ]; then
+    start cloudflared run_cloudflared
+fi
 
 while :; do
     for pid in $pids; do
