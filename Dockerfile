@@ -4,8 +4,8 @@
 # Override either source locally with:
 #   --build-context navidrome=docker-image://<image>   (e.g. an image built from ../navidrome)
 #   --build-context octo-src=../octo-fiesta
-ARG NAVIDROME_IMAGE=ghcr.io/filipton/navidrome:develop
-ARG OCTO_REPO=https://github.com/filipton/octo-fiesta.git
+ARG NAVIDROME_IMAGE=ghcr.io/norifm/navidrome:develop
+ARG OCTO_REPO=https://github.com/norifm/octo-fiesta.git
 ARG OCTO_REF=dev
 ARG CLOUDFLARED_IMAGE=cloudflare/cloudflared:latest
 
@@ -54,7 +54,7 @@ RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked \
 ########################################################################################################################
 ### Final image: navidrome's runtime (ffmpeg, mpv, sqlite, libwebp) + .NET runtime + nginx + cloudflared
 FROM navidrome AS final
-LABEL org.opencontainers.image.source="https://github.com/filipton/navi-fiesta"
+LABEL org.opencontainers.image.source="https://github.com/norifm/bento"
 LABEL org.opencontainers.image.description="Navidrome + octo-fiesta behind one nginx port"
 
 # icu-data-en instead of icu-data-full: octo-fiesta only needs Unicode normalization, not locale data (-27MB).

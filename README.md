@@ -1,15 +1,15 @@
 # navi-fiesta
 
 One multi-arch image (`linux/amd64`, `linux/arm64`) with the
-[navidrome](https://github.com/filipton/navidrome) and
-[octo-fiesta](https://github.com/filipton/octo-fiesta) forks behind a single port.
+[navidrome](https://github.com/norifm/navidrome) and
+[octo-fiesta](https://github.com/norifm/octo-fiesta) forks behind a single port.
 
 ```
 :4533 nginx ─┬─ /rest/{search3,stream,getSong,getAlbum,…}  → octo-fiesta 127.0.0.1:5274
              └─ everything else (UI, /api, SSE, other /rest) → navidrome   127.0.0.1:4534
 ```
 
-- **Small**: extends the prebuilt `ghcr.io/filipton/navidrome:develop` image and adds only the ASP.NET
+- **Small**: extends the prebuilt `ghcr.io/norifm/navidrome:develop` image and adds only the ASP.NET
   runtime, octo-fiesta, nginx, tini and cloudflared (~425 MB total, of which navidrome's base is ~250 MB).
   Only English ICU data is shipped.
 - **Fast to build**: navidrome is not recompiled; octo-fiesta is cross-compiled for musl on the
@@ -105,5 +105,5 @@ docker buildx build \
   -t navi-fiesta .
 ```
 
-CI (`.github/workflows/docker.yml`) publishes `ghcr.io/filipton/navi-fiesta:latest` on push,
+CI (`.github/workflows/docker.yml`) publishes `ghcr.io/norifm/navi-fiesta:latest` on push,
 daily, on manual dispatch, and on a `repository_dispatch` event of type `upstream-updated`.

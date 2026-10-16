@@ -38,7 +38,7 @@ jobs:
 
       - name: Resolve octo-fiesta revision
         id: octo
-        run: echo "sha=$(git ls-remote https://github.com/filipton/octo-fiesta.git refs/heads/dev | cut -c1-40)" >> "$GITHUB_OUTPUT"
+        run: echo "sha=$(git ls-remote https://github.com/norifm/octo-fiesta.git refs/heads/dev | cut -c1-40)" >> "$GITHUB_OUTPUT"
 
       # amd64 and arm64 both build natively on the x86 runner: navidrome comes prebuilt and
       # octo-fiesta is cross-compiled by the .NET SDK, so no QEMU is involved.

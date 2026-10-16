@@ -1,6 +1,6 @@
 services:
   navi-fiesta:
-    image: ghcr.io/filipton/navi-fiesta:latest
+    image: ghcr.io/norifm/navi-fiesta:latest
     container_name: navi-fiesta
     restart: unless-stopped
     # Not needed when using the Cloudflare Tunnel (TUNNEL_TOKEN below).
