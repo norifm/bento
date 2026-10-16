@@ -28,7 +28,7 @@ ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     DOTNET_NOLOGO=1
 
 COPY --from=octo-src octo-fiesta/octo-fiesta.csproj octo-fiesta/
-RUN --mount=type=cache,target=/root/.nuget/packages <<EOT
+RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked <<EOT
     set -e
     case "$TARGETARCH" in
         amd64) RID=linux-musl-x64 ;;
@@ -41,7 +41,7 @@ EOT
 
 COPY --from=octo-src octo-fiesta/ octo-fiesta/
 # ReadyToRun precompiles the IL, so the proxy starts fast and skips most JIT work on the phone.
-RUN --mount=type=cache,target=/root/.nuget/packages \
+RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked \
     dotnet publish octo-fiesta/octo-fiesta.csproj \
         -c Release -r "$(cat /rid)" --self-contained false --no-restore \
         -p:PublishReadyToRun=true \
