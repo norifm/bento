@@ -2,11 +2,13 @@
 
 One multi-arch image (`linux/amd64`, `linux/arm64`) with the
 [navidrome](https://github.com/norifm/navidrome) and
-[octo-fiesta](https://github.com/norifm/octo-fiesta) forks behind a single port.
+[octo-fiesta](https://github.com/norifm/octo-fiesta) forks and the [nori](https://github.com/norifm/nori)
+web client behind a single port.
 
 ```
 :4533 nginx ─┬─ /rest/{search3,stream,getSong,getAlbum,…}  → octo-fiesta 127.0.0.1:5274
-             └─ everything else (UI, /api, SSE, other /rest) → navidrome   127.0.0.1:4534
+             ├─ / and the web client's files              → nori web    /srv/nori-web
+             └─ everything else (/app, /api, SSE, other /rest) → navidrome 127.0.0.1:4534
 ```
 
 - **Small**: extends the prebuilt `ghcr.io/norifm/navidrome:develop` image and adds only the ASP.NET
@@ -93,6 +95,14 @@ server {
 Headers set by the outer proxy (`X-Real-IP`, `X-Forwarded-Proto`, `X-Forwarded-Host`) are passed
 through unchanged. A sub-path `ND_BASEURL` is not supported, because octo-fiesta's routes are rooted at `/rest`.
 
+### The nori web client
+
+The server's address opens [nori](https://github.com/norifm/nori)'s web client, which signs in to this
+server only; navidrome's own UI stays at `/app/`. The image copies it from `ghcr.io/norifm/nori-web`,
+which nori's CI publishes. The browser keeps the client's library in storage only a secure page may use,
+so open it over https (the tunnel, or an outer proxy with TLS) or on `localhost`, not over plain http on
+a LAN address.
+
 ## Building locally
 
 ```sh
@@ -102,6 +112,7 @@ docker buildx build --platform linux/amd64,linux/arm64 -t navi-fiesta .
 docker buildx build \
   --build-context octo-src=../octo-fiesta \
   --build-context navidrome=docker-image://my-local-navidrome \
+  --build-arg NORI_WEB_IMAGE=my-local-nori-web \
   -t navi-fiesta .
 ```
 
