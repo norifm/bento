@@ -8,9 +8,11 @@ ARG NAVIDROME_IMAGE=ghcr.io/norifm/navidrome:develop
 ARG OCTO_REPO=https://github.com/norifm/octo-fiesta.git
 ARG OCTO_REF=dev
 ARG CLOUDFLARED_IMAGE=cloudflare/cloudflared:latest
+ARG NORI_WEB_IMAGE=ghcr.io/norifm/nori-web:latest
 
 FROM ${NAVIDROME_IMAGE} AS navidrome
 FROM ${CLOUDFLARED_IMAGE} AS cloudflared
+FROM ${NORI_WEB_IMAGE} AS nori-web
 
 FROM scratch AS octo-src
 ARG OCTO_REPO
@@ -55,7 +57,7 @@ RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked \
 ### Final image: navidrome's runtime (ffmpeg, mpv, sqlite, libwebp) + .NET runtime + nginx + cloudflared
 FROM navidrome AS final
 LABEL org.opencontainers.image.source="https://github.com/norifm/bento"
-LABEL org.opencontainers.image.description="Navidrome + octo-fiesta behind one nginx port"
+LABEL org.opencontainers.image.description="Navidrome + octo-fiesta + the nori web client behind one nginx port"
 
 # icu-data-en instead of icu-data-full: octo-fiesta only needs Unicode normalization, not locale data (-27MB).
 # (Alpine's dotnet9-runtime package hard-depends on icu-data-full, hence the runtime copy below.)
@@ -67,6 +69,8 @@ RUN ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet
 COPY --from=octo-build /out /opt/octo-fiesta
 # Static Go binary; only started when TUNNEL_TOKEN is set.
 COPY --from=cloudflared /usr/local/bin/cloudflared /usr/local/bin/cloudflared
+# nori's web client, served at / by nginx; it signs in to this server only.
+COPY --from=nori-web / /srv/nori-web
 COPY --chmod=755 rootfs/usr/local/bin/ /usr/local/bin/
 COPY rootfs/etc/nginx/nginx.conf /etc/nginx/nginx.conf
 RUN nginx -e stderr -t -q && rm -rf /tmp/nginx*
